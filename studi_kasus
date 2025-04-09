@@ -77,6 +77,54 @@ CREATE TABLE `Transaksi` (
     FOREIGN KEY (user_id) REFERENCES Pengguna(user_id)
 );
 
+INSERT INTO Pengguna (user_id, nama, email, password, member, join_date) VALUES
+(1, 'Gatotkaca', 'mobile@gmail.com', 'bing123', TRUE, '2024-01-15 10:00:00'),
+(2, 'Jungkook', 'jongkok@gmail.com', 'bing1233', FALSE, '2024-02-20 09:30:00'),
+(3, 'Jisso', 'jisso@gmail.com', 'bing333', TRUE, '2024-03-10 12:15:00'),
+(4, 'Tebing', 'tebingganteng@gmail.com', 'bing12', FALSE, NOW());
+
+INSERT INTO Artis VALUES
+(1, 'NIKI'),
+(2, 'One Direction'),
+(3, 'Gracie Abrams'),
+(4, 'The 1975');
+
+INSERT INTO Album VALUES
+(1, 'Album NIKI', 1, '2022-01-01'),
+(2, 'Album 1D', 2, '2021-06-01'),
+(3, 'Album Gracie', 3, '2023-03-15'),
+(4, 'Album 1975', 4, '2020-09-09');
+
+INSERT INTO Lagu (lagu_id, judul, durasi, album_id, play_count) VALUES
+(1, "You'll Be in My Heart", 220, 1, 0),
+(2, 'Where We Are', 200, 2, 0),
+(3, "That’s So True", 150, 3, 0),
+(4, 'About You 1975', 240, 4, 0);
+
+INSERT INTO Playlist VALUES
+(1, 1, 'Chill Bing', '2025-04-01 18:00:00'),
+(2, 2, 'Workout', '2025-03-25 07:45:00'),
+(3, 3, 'Badmood', NOW()),
+(4, 4, 'Galau', NOW());
+
+INSERT INTO Playlist_Lagu VALUES
+(1, 1),
+(2, 2),
+(3, 3),
+(4, 4);
+
+INSERT INTO Riwayat_Lagu VALUES
+(1, 1, 1, '2026-03-01 10:00:00'),
+(2, 2, 2, '2025-03-05 10:05:00'),
+(3, 3, 3, '2025-03-07 12:00:00'),
+(4, 4, 4, '2025-03-03 13:30:00');
+
+INSERT INTO Transaksi VALUES
+(1, 1, 49.99, '2025-02-27 10:01:00', 'SUCCESS'),
+(2, 2, 49.99, '2025-03-10 12:16:00', 'SUCCESS');
+
+
+
 1. DELIMITER $$
 CREATE TRIGGER trg_update_play_count
 AFTER INSERT ON riwayat_lagu
