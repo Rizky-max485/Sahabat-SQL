@@ -1,113 +1,84 @@
--- Membuat database
-CREATE DATABASE perpustakaan;
-USE perpustakaan;
-
--- Membuat tabel
-CREATE TABLE kategori (
-    id_kategori INT PRIMARY KEY AUTO_INCREMENT,
-    nama_kategori VARCHAR(50) NOT NULL,
-    deskripsi TEXT
+CREATE TABLE Produk (
+    id_produk INT AUTO_INCREMENT PRIMARY KEY,
+    nama_produk VARCHAR(100),
+    stok INT,
+    harga DECIMAL(10,2)
 );
 
-CREATE TABLE buku (
-    id_buku INT PRIMARY KEY AUTO_INCREMENT,
-    judul VARCHAR(100) NOT NULL,
-    id_kategori INT,
-    pengarang VARCHAR(100),
-    penerbit VARCHAR(100),
-    tahun_terbit INT,
-    stok INT DEFAULT 0,
-    FOREIGN KEY (id_kategori) REFERENCES kategori(id_kategori)
+CREATE TABLE Penjualan (
+    id_penjualan INT AUTO_INCREMENT PRIMARY KEY,
+    id_produk INT,
+    jumlah INT,
+    tanggal_penjualan DATE DEFAULT CURRENT_DATE,
+    FOREIGN KEY (id_produk) REFERENCES Produk(id_produk)
 );
 
-CREATE TABLE anggota (
-    id_anggota INT PRIMARY KEY AUTO_INCREMENT,
-    nama VARCHAR(100) NOT NULL,
-    alamat TEXT,
-    email VARCHAR(100),
-    no_telepon VARCHAR(15),
-    tanggal_daftar DATE DEFAULT CURRENT_DATE
+CREATE TABLE Log_Stok (
+    id_log INT AUTO_INCREMENT PRIMARY KEY,
+    id_produk INT,
+    aksi VARCHAR(50),
+    jumlah INT,
+    info VARCHAR(255),
+    tanggal_log TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE peminjaman (
-    id_peminjaman INT PRIMARY KEY AUTO_INCREMENT,
-    id_anggota INT,
-    tanggal_pinjam DATE DEFAULT CURRENT_DATE,
-    tanggal_kembali DATE,
-    status_peminjaman ENUM('Dipinjam', 'Dikembalikan', 'Terlambat'),
-    FOREIGN KEY (id_anggota) REFERENCES anggota(id_anggota)
-);
+INSERT INTO Produk(nama_produk, stok, harga) VALUES
+('Mouse Logitech', 50, 150000),
+('Keyboard Mechanical', 30, 350000),
+('Monitor 24 Inch', 20, 1500000),
+('Webcam Full HD', 25, 500000);
 
-CREATE TABLE detail_peminjaman (
-    id_detail INT PRIMARY KEY AUTO_INCREMENT,
-    id_peminjaman INT,
-    id_buku INT,
-    FOREIGN KEY (id_peminjaman) REFERENCES peminjaman(id_peminjaman),
-    FOREIGN KEY (id_buku) REFERENCES buku(id_buku)
-);
+INSERT INTO Penjualan(id_produk, jumlah) VALUES
+(1, 3),
+(2, 2),
+(3, 1);
 
-CREATE TABLE log_aktivitas (
-    id_log INT PRIMARY KEY AUTO_INCREMENT,
-    tanggal DATETIME DEFAULT CURRENT_TIMESTAMP,
-    tabel VARCHAR(50),
-    aksi VARCHAR(20),
-    deskripsi TEXT,
-    user VARCHAR(50)
-);
 
--- TRIGGER INSERT
+
 DELIMITER $$
-CREATE TRIGGER after_insert_buku
-AFTER INSERT ON buku
+CREATE TRIGGER trg_before_insert_penjualan
+BEFORE INSERT ON Penjualan
 FOR EACH ROW
 BEGIN
-INSERT INTO log_aktivitas (tabel, aksi, deskripsi, user)
-VALUES ('buku', 'INSERT', CONCAT('Buku baru: ', NEW.judul), USER());
-END $$
+    DECLARE stok_saat_ini INT;
+    SELECT stok INTO stok_saat_ini FROM Produk WHERE id_produk = NEW.id_produk;
+    IF stok_saat_ini < NEW.jumlah THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Stok tidak cukup untuk penjualan ini.';
+    END IF;
+    UPDATE Produk SET stok = stok - NEW.jumlah WHERE id_produk = NEW.id_produk;
+END$$
 DELIMITER ;
 
--- TRIGGER UPDATE
 DELIMITER $$
-CREATE TRIGGER after_update_buku
-AFTER UPDATE ON buku
+CREATE TRIGGER trg_after_delete_penjualan
+AFTER DELETE ON Penjualan
 FOR EACH ROW
 BEGIN
-IF NEW.stok != OLD.stok THEN
-    INSERT INTO log_aktivitas (tabel, aksi, deskripsi, user)
-    VALUES ('buku', 'UPDATE', CONCAT('Stok berubah: ', OLD.stok, ' -> ', NEW.stok), USER());
-END IF;
-END $$
+    INSERT INTO Log_Stok(id_produk, aksi, jumlah, info)
+    VALUES(OLD.id_produk, 'Batal Penjualan', OLD.jumlah, 'AFTER DELETE log');
+END$$
 DELIMITER ;
 
--- TRIGGER DELETE
 DELIMITER $$
-CREATE TRIGGER before_delete_buku
-BEFORE DELETE ON buku
-BEGIN
+CREATE TRIGGER trg_after_update_penjualan
+AFTER UPDATE ON Penjualan
 FOR EACH ROW
-INSERT INTO log_aktivitas (tabel, aksi, deskripsi, user)
-VALUES ('buku', 'DELETE', CONCAT('Buku dihapus: ', OLD.judul), USER());
-END $$
+BEGIN
+    INSERT INTO Log_Stok(id_produk, aksi, jumlah, info)
+    VALUES(NEW.id_produk, 'Update Penjualan', NEW.jumlah - OLD.jumlah, 'AFTER UPDATE log');
+END$$
 DELIMITER ;
 
--- Fungsi Agregat
-SELECT k.nama_kategori, COUNT(b.id_buku) AS jumlah_buku, 
-       SUM(b.stok) AS total_stok,
-       AVG(b.tahun_terbit) AS rata_rata_tahun_terbit
-FROM kategori k
-LEFT JOIN buku b ON k.id_kategori = b.id_kategori
-GROUP BY k.id_kategori;
+SELECT pr.nama_produk, SUM(p.jumlah) AS total_terjual
+FROM Penjualan p
+JOIN Produk pr ON p.id_produk = pr.id_produk
+GROUP BY p.id_produk
+ORDER BY total_terjual DESC
+LIMIT 1;
 
--- TCL (Transaction Control Language)
 START TRANSACTION;
-    SAVEPOINT kosong;
-    INSERT INTO peminjaman (id_anggota, tanggal_kembali)
-    VALUES (1, DATE_ADD(CURRENT_DATE, INTERVAL 7 DAY));
-    SAVEPOINT insert_peminjaman;
-    INSERT INTO detail_peminjaman (id_peminjaman, id_buku)
-    VALUES (LAST_INSERT_ID(), 1);
-    SAVEPOINT insert_detail_peminjaman;
-    UPDATE buku SET stok = stok - 1 
-    WHERE id_buku = 1;
-    SAVEPOINT update;
-    COMMIT;
+INSERT INTO Penjualan(id_produk, jumlah) VALUES (2, 2);
+INSERT INTO Penjualan(id_produk, jumlah) VALUES (3, 999);
+ROLLBACK;
+COMMIT;
