@@ -1,0 +1,146 @@
+CREATE TABLE `pengguna` (
+	`user_id` INTEGER,
+	`nama` VARCHAR(255) NOT NULL,
+	`email` VARCHAR(255) NOT NULL UNIQUE,
+	`password` VARCHAR(255) NOT NULL,
+	`member` BOOLEAN DEFAULT FALSE,
+	`join_date` DATETIME,
+	PRIMARY KEY(`user_id`)
+);
+
+
+CREATE TABLE `Artis` (
+	`artis_id` INTEGER,
+	`nama` VARCHAR(255),
+	PRIMARY KEY(`artis_id`)
+);
+
+
+CREATE TABLE `Album` (
+	`album_id` INTEGER,
+	`judul` VARCHAR(255),
+	`artis_id` INTEGER,
+	`rilis_date` DATE,
+	PRIMARY KEY(`album_id`),
+    FOREIGN KEY (artis_id) REFERENCES Artis(artis_id)
+);
+
+
+CREATE TABLE `Lagu` (
+	`lagu_id` INTEGER,
+	`judul` VARCHAR(255),
+	`durasi` INTEGER,
+	`album_id` INTEGER,
+	`play_count` INTEGER DEFAULT 0,
+	PRIMARY KEY(`lagu_id`),
+    FOREIGN KEY (album_id) REFERENCES Album(album_id)
+);
+
+
+CREATE TABLE `Playlist` (
+	`playlist_id` INTEGER,
+	`user_id` INTEGER,
+	`playlist_nama` VARCHAR(255),
+	`playlist_dibuat` DATETIME,
+	PRIMARY KEY(`playlist_id`),
+    FOREIGN KEY (user_id) REFERENCES Pengguna(user_id)
+);
+
+
+CREATE TABLE `Playlist_Lagu` (
+	`playlist_id` INTEGER,
+	`lagu_id` INTEGER,
+	PRIMARY KEY(`playlist_id`, `lagu_id`),
+    FOREIGN KEY (playlist_id) REFERENCES Playlist(playlist_id),
+    FOREIGN KEY (lagu_id) REFERENCES Lagu(lagu_id)
+);
+
+
+CREATE TABLE `riwayat_lagu` (
+	`riwayat_id` INTEGER,
+	`user_id` INTEGER,
+	`lagu_id` INTEGER,
+	`play_lagu` DATETIME,
+	PRIMARY KEY(`riwayat_id`),
+    FOREIGN KEY (user_id) REFERENCES Pengguna(user_id),
+    FOREIGN KEY (lagu_id) REFERENCES Lagu(lagu_id)
+);
+
+
+CREATE TABLE `Transaksi` (
+	`transaksi_id` INTEGER,
+	`user_id` INTEGER,
+	`saldo` DECIMAL,
+	`transaksi_date` DATETIME,
+	`status` VARCHAR(255),
+	PRIMARY KEY(`transaksi_id`),
+    FOREIGN KEY (user_id) REFERENCES Pengguna(user_id)
+);
+
+1. DELIMITER $$
+CREATE TRIGGER trg_update_play_count
+AFTER INSERT ON riwayat_lagu
+FOR EACH ROW
+BEGIN
+    UPDATE lagu
+    SET play_count = play_count + 1
+    WHERE lagu_id = NEW.lagu_id;
+END;
+DELIMITER ;
+
+2. DELIMITER $$ 
+CREATE TRIGGER trg_check_transaction_amount
+BEFORE INSERT ON Transaksi
+FOR EACH ROW
+BEGIN
+    IF NEW.saldo < 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Saldo tidak boleh negatif';
+    END IF;
+END;
+DELIMITER ;
+
+3. START TRANSACTION;
+
+INSERT INTO Transaksi(transaksi_id, user_id, saldo, transaksi_date, status)
+VALUES (3, 2, 49.99, NOW(), 'SUCCESS');
+
+UPDATE Pengguna
+SET member = TRUE
+WHERE user_id = 2;
+
+COMMIT;
+
+4. SELECT l.judul, COUNT(rl.lagu_id) AS jumlah_diputar
+FROM riwayat_lagu rl
+JOIN lagu l ON rl.lagu_id = l.lagu_id
+GROUP BY rl.lagu_id, l.judul
+ORDER BY jumlah_diputar DESC
+LIMIT 5;
+
+5. SELECT l.judul, COUNT(rl.lagu_id) AS jumlah_diputar
+FROM riwayat_lagu rl
+JOIN lagu l ON rl.lagu_id = l.lagu_id
+GROUP BY rl.lagu_id, l.judul
+ORDER BY jumlah_diputar DESC
+LIMIT 5;
+
+ATAU 
+
+SELECT a.nama AS artis, COUNT(rl.lagu_id) AS total_diputar
+FROM riwayat_lagu rl
+JOIN lagu l ON rl.lagu_id = l.lagu_id
+JOIN album al ON l.album_id = al.album_id
+JOIN artis a ON al.artis_id = a.artis_id
+GROUP BY a.nama
+ORDER BY total_diputar DESC
+LIMIT 5;
+
+
+6. SELECT SUM(saldo) AS total_pendapatan
+FROM Transaksi
+WHERE status = 'SUCCESS'
+AND user_id IN (
+  SELECT user_id FROM Pengguna WHERE member = TRUE
+);
+
